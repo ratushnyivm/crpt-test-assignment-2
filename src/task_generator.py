@@ -1,14 +1,12 @@
 import datetime
 import json
-import os
 import random
 import uuid
 
 import psycopg2
 import psycopg2.extras
-from dotenv import load_dotenv
 
-load_dotenv()
+import config
 
 inns = ['owner_1', 'owner_2', 'owner_3', 'owner_4']
 status = [1, 2, 3, 4, 10, 13]
@@ -17,12 +15,12 @@ d_type = ['transfer_document', 'not_transfer_document']
 
 class PsqlTools:
     def __init__(self):
-        self.conn = {'host': os.getenv('POSTGRES_HOST', '127.0.0.1'),
-                     'user': os.getenv('POSTGRES_USER', 'postgres'),
-                     'password': os.getenv('POSTGRES_PASSWORD', 'postgres'),
-                     'db': os.getenv('POSTGRES_NAME', 'test_migration')}        # заполнить название бд, не принципиально
-        self.port = os.getenv('POSTGRES_PORT', '5432')
-        self.schema = os.getenv('POSTGRES_SCHEMA', 'public')
+        self.conn = {'host': config.POSTGRES_HOST,
+                     'user': config.POSTGRES_USER,
+                     'password': config.POSTGRES_PASSWORD,
+                     'db': config.POSTGRES_DB}        # заполнить название бд, не принципиально
+        self.port = config.POSTGRES_PORT
+        self.schema = config.POSTGRES_SCHEMA
 
     def query(self, q, list_conditions = None):
         xsql3_con = psycopg2.connect(host=self.conn.get('host'), dbname=self.conn.get('db'),
@@ -87,9 +85,9 @@ def make_data(_p: PsqlTools, commit=True) -> [dict, set]:
 
 
 def make_documents(_p: PsqlTools, data: dict, commit=True):
-    saler = reciver = random.choice(inns)
-    while saler == reciver:
-        reciver = random.choice(inns)
+    saler = reciever = random.choice(inns)
+    while saler == reciever:
+        reciever = random.choice(inns)
 
     doc = dict()
     dd = doc['document_data'] = dict()
@@ -114,7 +112,7 @@ def make_documents(_p: PsqlTools, data: dict, commit=True):
 
     if commit:
         _p.insert('documents', {'doc_id': id,
-                                'recived_at': datetime.datetime.now(),
+                                'recieved_at': datetime.datetime.now(),
                                 'document_type': dd['document_type'],
                                 'document_data': json.dumps(doc)})
 
@@ -137,7 +135,7 @@ def __make_tables(_p: PsqlTools):
                 CREATE TABLE IF NOT EXISTS public.documents
                 (
                     doc_id character varying COLLATE pg_catalog."default" NOT NULL,
-                    recived_at timestamp without time zone,
+                    recieved_at timestamp without time zone,
                     document_type character varying COLLATE pg_catalog."default",
                     document_data jsonb,
                     processed_at timestamp without time zone,
@@ -177,7 +175,7 @@ def __make_tables(_p: PsqlTools):
         }
     }
 
-    После запуска скрипта он должен брать 1 запись из таблицы documents (сортировка по полю recived_at ASC) по условиям:
+    После запуска скрипта он должен брать 1 запись из таблицы documents (сортировка по полю recieved_at ASC) по условиям:
         тип документа: transfer_document
         поле processed_at: is NULL 
     и обрабатывать содержимое поля document_data, которое содержит условное содержимое документа, по алгоритму:
