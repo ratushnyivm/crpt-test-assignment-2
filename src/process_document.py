@@ -5,6 +5,7 @@ import database
 
 
 class ProcessDocument:
+    """Класс для обработки документа и связанных с ним объектов."""
 
     document = None
     operation_details = None
@@ -13,6 +14,12 @@ class ProcessDocument:
         self.db = db
 
     def get_document(self) -> dict | None:
+        """
+        Получение документа для обработки.
+        Возвращает словарь, где ключ - поле таблицы в базе данных,
+        а значение - содержимое ячейки.
+        """
+
         sql_query = """
             SELECT doc_id, document_data
             FROM documents
@@ -31,12 +38,22 @@ class ProcessDocument:
             )
             return self.document
 
-    def get_document_objects(self) -> list:
+    def get_document_objects(self) -> list[str]:
+        """
+        Получение объектов документа без учёта дочерних.
+        Возвращает список строк, которые являются идентификаторами объектов.
+        """
+
         doc_objects = self.document.get('document_data').get('objects')
         return doc_objects
 
     def get_valid_operation_details(self) -> dict[str, dict]:
-        """Получить детали, у которых присутствуют поля old и new."""
+        """
+        Валидация деталей операций.
+        Возвращает словарь, где ключ - подлежащее изменению поле объекта,
+        а значение - словарь с ключами 'old' и 'new', указывающими на то,
+        какие значения подлежат изменению.
+        """
 
         self.operation_details = self.document.get('document_data')\
             .get('operation_details')
@@ -48,6 +65,13 @@ class ProcessDocument:
         return self.operation_details
 
     def get_related_objects(self) -> list[dict] | None:
+        """
+        Получение всех связанных с документом объектов, которые удовлетворяют
+        условиям деталей операций.
+        Возвращает список из словарей для каждого объекта, где ключ - поле
+        таблицы в базе данных, а значение - содержимое ячейки.
+        """
+
         if not self.document:
             return
 
@@ -92,8 +116,14 @@ class ProcessDocument:
         return related_objects
 
     def update_related_objects(self) -> bool | None:
+        """Обновление всех связанных с документом объектов."""
+
         related_objects = self.get_related_objects()
         if not related_objects or not self.operation_details:
+            logging.info(
+                'Обновление пропущено, так как отсутствуют подходящие объекты \
+                 и/или детали операции.'
+            )
             return
 
         # Аккумулятор списка объектов для каждой изменяемой колонки
@@ -119,9 +149,10 @@ class ProcessDocument:
             f"Все объекты, связанные с документом "
             f"[id = {self.document['doc_id']}], успешно обновлены"
         )
-        return True
 
     def update_document(self) -> None:
+        """Установка времени обновления документа."""
+
         query = """
             UPDATE documents
             SET processed_at = now()

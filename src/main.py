@@ -28,7 +28,7 @@ def main() -> bool:
             return True
         logging.info('Документ, требующий внесения изменений, не обнаружен')
         return True
-    except RuntimeError as e:
+    except Exception as e:
         logging.error(e)
         return False
 

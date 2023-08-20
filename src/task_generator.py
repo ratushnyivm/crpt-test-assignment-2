@@ -20,7 +20,7 @@ class PsqlTools:
                      'password': config.POSTGRES_PASSWORD,
                      'db': config.POSTGRES_DB}
         self.port = config.POSTGRES_PORT
-        self.schema = config.POSTGRES_SCHEMA
+        self.schema = 'public'
 
     def query(self, q, list_conditions = None):
         xsql3_con = psycopg2.connect(host=self.conn.get('host'), dbname=self.conn.get('db'),
