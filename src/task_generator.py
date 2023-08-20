@@ -18,7 +18,7 @@ class PsqlTools:
         self.conn = {'host': config.POSTGRES_HOST,
                      'user': config.POSTGRES_USER,
                      'password': config.POSTGRES_PASSWORD,
-                     'db': config.POSTGRES_DB}        # заполнить название бд, не принципиально
+                     'db': config.POSTGRES_DB}
         self.port = config.POSTGRES_PORT
         self.schema = config.POSTGRES_SCHEMA
 
