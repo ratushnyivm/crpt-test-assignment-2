@@ -149,6 +149,10 @@ class ProcessDocument:
         for key, value in list(self.operation_details.items()):
             if not (value.get('old') and value.get('new')):
                 del self.operation_details[key]
+
+        if not self.operation_details:
+            return
+
         logging.info("Поля, требующие изменений, успешно провалидированы")
         return self.operation_details
 
@@ -164,7 +168,7 @@ class ProcessDocument:
             return
 
         doc_objects = self.get_document_objects()
-        if not doc_objects:
+        if not (doc_objects and self.operation_details):
             return
 
         # Генерация списка колонок, значения которых подлежат изменению, и
@@ -210,7 +214,7 @@ class ProcessDocument:
         """Обновление всех связанных с документом объектов."""
 
         related_objects = self.get_related_objects()
-        if not related_objects or not self.operation_details:
+        if not (related_objects and self.operation_details):
             logging.info(
                 'Обновление пропущено, так как отсутствуют подходящие объекты '
                 'и/или детали операции.'
@@ -279,11 +283,14 @@ def main() -> bool:
             doc_process.update_document()
             return True
         logging.info('Документ, требующий внесения изменений, не обнаружен')
-        return True
+        return False
     except Exception as e:
         logging.error(e)
         return False
 
 
 if __name__ == '__main__':
-    main()
+    while True:
+        if not main():
+            break
+    logging.info('Выполнение скрипта остановлено')
