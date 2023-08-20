@@ -1,7 +1,89 @@
 import collections
 import logging
+import os
 
-import database
+import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
+
+POSTGRES_HOST = os.getenv('POSTGRES_HOST', '127.0.0.1')
+POSTGRES_USER = os.getenv('POSTGRES_USER', 'postgres')
+POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD', 'postgres')
+POSTGRES_DB = os.getenv('POSTGRES_DB', 'test_migration')
+POSTGRES_PORT = os.getenv('POSTGRES_PORT', '5432')
+
+
+class PsqlManager:
+    """"Менеджер для работы с PostgreSQL."""
+
+    __connection = None
+    __cursor = None
+
+    def __init__(self,
+                 db: str,
+                 user: str,
+                 password: str,
+                 host: str = 'localhost',
+                 port: str = '5432') -> None:
+        self.db = db
+        self.user = user
+        self.password = password
+        self.host = host
+        self.port = port
+
+    def select_one(self, query: str) -> tuple | None:
+        """Получение одной записи из базы данных, возвращает кортеж."""
+
+        self.__open_connect()
+        if self.__connection:
+            self.__cursor.execute(query)
+            row = self.__cursor.fetchone()
+            self.__connection.commit()
+            self.__close_connect()
+            return row
+
+    def select_all(self, query: str, vars: dict) -> list[tuple] | None:
+        """Получение всех записей из базы данных, возвращает список кортежей."""
+
+        self.__open_connect()
+        if self.__connection:
+            self.__cursor.execute(query, vars)
+            rows = self.__cursor.fetchall()
+            self.__connection.commit()
+            self.__close_connect()
+            return rows
+
+    def update_one(self, query: str, vars: dict) -> None:
+        """Отправление одного запроса на обновление в базу данных."""
+
+        self.__open_connect()
+        if self.__connection:
+            self.__cursor.execute(query, vars)
+            self.__connection.commit()
+            self.__close_connect()
+
+    def __open_connect(self) -> None:
+        """Открытие соединения с базой данных и получение курсора."""
+
+        try:
+            self.__connection = psycopg2.connect(
+                dbname=self.db,
+                user=self.user,
+                password=self.password,
+                host=self.host,
+                port=self.port
+            )
+            self.__cursor = self.__connection.cursor()
+        except psycopg2.OperationalError as e:
+            logging.error(e)
+            return
+
+    def __close_connect(self) -> None:
+        """Закрытие курсора и соединения с базой данных."""
+
+        self.__cursor.close()
+        self.__connection.close()
 
 
 class ProcessDocument:
@@ -10,7 +92,7 @@ class ProcessDocument:
     document = None
     operation_details = None
 
-    def __init__(self, db: database.PsqlManager) -> None:
+    def __init__(self, db: PsqlManager) -> None:
         self.db = db
 
     def get_document(self) -> dict | None:
@@ -38,13 +120,19 @@ class ProcessDocument:
             )
             return self.document
 
-    def get_document_objects(self) -> list[str]:
+    def get_document_objects(self) -> list[str] | None:
         """
         Получение объектов документа без учёта дочерних.
         Возвращает список строк, которые являются идентификаторами объектов.
         """
 
         doc_objects = self.document.get('document_data').get('objects')
+        if not doc_objects:
+            logging.info(
+                f"Документ [id = {self.document['doc_id']}] не содержит "
+                f"ссылок на другие объекты"
+            )
+            return
         return doc_objects
 
     def get_valid_operation_details(self) -> dict[str, dict]:
@@ -75,6 +163,10 @@ class ProcessDocument:
         if not self.document:
             return
 
+        doc_objects = self.get_document_objects()
+        if not doc_objects:
+            return
+
         # Генерация списка колонок, значения которых подлежат изменению, и
         # списка условий соответствия имеющихся значений в таблице дата
         # значениям old в operation details
@@ -97,7 +189,7 @@ class ProcessDocument:
             WHERE (object IN %(doc_objects)s OR parent IN %(doc_objects)s)
                 AND ({condition})
         """
-        vars = {'doc_objects': tuple(self.get_document_objects())}
+        vars = {'doc_objects': tuple(doc_objects)}
         rows = self.db.select_all(query, vars)
 
         if not rows:
@@ -163,3 +255,35 @@ class ProcessDocument:
             f"Дата и время обновления документа "
             f"[id = {self.document['doc_id']}] успешно установлены"
         )
+
+
+def main() -> bool:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s :: %(levelname)s :: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    db = PsqlManager(
+        db=POSTGRES_DB,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
+        host=POSTGRES_HOST,
+        port=POSTGRES_PORT
+    )
+    doc_process = ProcessDocument(db)
+    try:
+        document = doc_process.get_document()
+        if document:
+            doc_process.get_valid_operation_details()
+            doc_process.update_related_objects()
+            doc_process.update_document()
+            return True
+        logging.info('Документ, требующий внесения изменений, не обнаружен')
+        return True
+    except Exception as e:
+        logging.error(e)
+        return False
+
+
+if __name__ == '__main__':
+    main()

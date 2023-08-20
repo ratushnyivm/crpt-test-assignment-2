@@ -2,4 +2,4 @@
 __pycache__/
 
 .env
-src/task_generator.py
+task_generator.py
