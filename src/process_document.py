@@ -20,14 +20,14 @@ class ProcessDocument:
         а значение - содержимое ячейки.
         """
 
-        sql_query = """
+        query = """
             SELECT doc_id, document_data
             FROM documents
             WHERE document_type = 'transfer_document' AND processed_at IS NULL
             ORDER BY recieved_at ASC
             LIMIT 1
         """
-        row = self.db.select_one(sql_query)
+        row = self.db.select_one(query)
         if row:
             self.document = {
                 'doc_id': row[0],
@@ -75,10 +75,9 @@ class ProcessDocument:
         if not self.document:
             return
 
-        doc_objects = tuple(self.get_document_objects())
-
-        # Генерация условия соответствия колонок в таблице data
-        # полям old в operation details
+        # Генерация списка колонок, значения которых подлежат изменению, и
+        # списка условий соответствия имеющихся значений в таблице дата
+        # значениям old в operation details
         column_list = ['object']
         condition = []
         for k, v in self.operation_details.items():
@@ -92,14 +91,14 @@ class ProcessDocument:
         columns = ', '.join(column_list)
         condition = ' OR '.join(condition)
 
-        sql_query = f"""
+        query = f"""
             SELECT {columns}
             FROM data
-            WHERE (object IN {doc_objects} OR parent IN {doc_objects})
+            WHERE (object IN %(doc_objects)s OR parent IN %(doc_objects)s)
                 AND ({condition})
         """
-        # print(sql_query)
-        rows = self.db.select_all(sql_query)
+        vars = {'doc_objects': tuple(self.get_document_objects())}
+        rows = self.db.select_all(query, vars)
 
         if not rows:
             logging.info('Объекты, требующие изменений, не найдены')
@@ -121,8 +120,8 @@ class ProcessDocument:
         related_objects = self.get_related_objects()
         if not related_objects or not self.operation_details:
             logging.info(
-                'Обновление пропущено, так как отсутствуют подходящие объекты \
-                 и/или детали операции.'
+                'Обновление пропущено, так как отсутствуют подходящие объекты '
+                'и/или детали операции.'
             )
             return
 

@@ -21,21 +21,23 @@ class PsqlManager:
         self.host = host
         self.port = port
 
-    def select_one(self, q) -> tuple | None:
+    def select_one(self, query: str) -> tuple | None:
         """Получение одной записи из базы данных, возвращает кортеж."""
+
         self.__open_connect()
         if self.__connection:
-            self.__cursor.execute(q)
+            self.__cursor.execute(query)
             row = self.__cursor.fetchone()
             self.__connection.commit()
             self.__close_connect()
             return row
 
-    def select_all(self, q) -> list[tuple] | None:
+    def select_all(self, query: str, vars: dict) -> list[tuple] | None:
         """Получение всех записей из базы данных, возвращает список кортежей."""
+
         self.__open_connect()
         if self.__connection:
-            self.__cursor.execute(q)
+            self.__cursor.execute(query, vars)
             rows = self.__cursor.fetchall()
             self.__connection.commit()
             self.__close_connect()
@@ -43,6 +45,7 @@ class PsqlManager:
 
     def update_one(self, query: str, vars: dict) -> None:
         """Отправление одного запроса на обновление в базу данных."""
+
         self.__open_connect()
         if self.__connection:
             self.__cursor.execute(query, vars)
@@ -51,6 +54,7 @@ class PsqlManager:
 
     def __open_connect(self) -> None:
         """Открытие соединения с базой данных и получение курсора."""
+
         try:
             self.__connection = psycopg2.connect(
                 dbname=self.db,
@@ -66,5 +70,6 @@ class PsqlManager:
 
     def __close_connect(self) -> None:
         """Закрытие курсора и соединения с базой данных."""
+
         self.__cursor.close()
         self.__connection.close()
